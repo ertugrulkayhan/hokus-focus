@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  
   await DataManager.init();
-  
   runApp(const HokusFocusApp());
 }
 
@@ -28,7 +28,8 @@ class DataManager {
   static int getToplamOturum() => _prefs.getInt('toplamOturum') ?? 0;
   static int getTamamlananOturum() => _prefs.getInt('tamamlananOturum') ?? 0;
   static int getEnUzunOdakSn() => _prefs.getInt('enUzunOdakSn') ?? 0;
-  static double getGenelAkisPuani() => _prefs.getDouble('genelAkisPuani') ?? 0.0;
+  static double getGenelAkisPuani() =>
+      _prefs.getDouble('genelAkisPuani') ?? 0.0;
 
   static Future<void> oturumKaydet({
     required int sureSn,
@@ -52,10 +53,19 @@ class DataManager {
     }
 
     double mevcutOrt = getGenelAkisPuani();
-    double yeniOrt = (mevcutOturum == 0) 
-        ? akisPuani 
+    double yeniOrt = (mevcutOturum == 0)
+        ? akisPuani
         : ((mevcutOrt * mevcutOturum) + akisPuani) / (mevcutOturum + 1);
     await _prefs.setDouble('genelAkisPuani', yeniOrt);
+  }
+
+  // --- YENİ EKLENEN SIFIRLAMA FONKSİYONU ---
+  static Future<void> verileriSifirla() async {
+    await _prefs.setInt('toplamSureSn', 0);
+    await _prefs.setInt('toplamOturum', 0);
+    await _prefs.setInt('tamamlananOturum', 0);
+    await _prefs.setInt('enUzunOdakSn', 0);
+    await _prefs.setDouble('genelAkisPuani', 0.0);
   }
 }
 
@@ -70,7 +80,9 @@ class HokusFocusApp extends StatelessWidget {
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFFF5F2EA),
         primaryColor: const Color(0xFF2E4035),
-        fontFamily: 'Courier', 
+        // --- SİHİRLİ DOKUNUŞ BURADA ---
+        textTheme: GoogleFonts.poppinsTextTheme(),
+        // ------------------------------
         useMaterial3: true,
       ),
       home: const KarsilamaEkrani(),
@@ -80,6 +92,9 @@ class HokusFocusApp extends StatelessWidget {
 
 // ----------------------------------------
 // 0. EKRAN: KARŞILAMA
+// ----------------------------------------
+// ----------------------------------------
+// 0. EKRAN: KARŞILAMA (YENİLENMİŞ VİTRİN TASARIMI)
 // ----------------------------------------
 class KarsilamaEkrani extends StatefulWidget {
   const KarsilamaEkrani({super.key});
@@ -111,6 +126,22 @@ class _KarsilamaEkraniState extends State<KarsilamaEkrani> {
     });
   }
 
+  // --- BLOG SAYFASINA GİTME FONKSİYONU ---
+  void _blogAc() {
+    // İleride buraya WebView veya Blog sayfası gelecek.
+    // Şimdilik sadece bir SnackBar gösterelim.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          "Blog yakında burada olacak!",
+          style: GoogleFonts.poppins(),
+        ),
+        backgroundColor: const Color(0xFF2E4035),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   String _formatSaatDk(int saniye) {
     if (saniye < 60) return "${saniye}sn";
     int saat = saniye ~/ 3600;
@@ -123,21 +154,85 @@ class _KarsilamaEkraniState extends State<KarsilamaEkrani> {
 
   void _istatistikleriGoster() {
     _verileriGuncelle();
-    int tamamlamaOrani = _toplamOturum > 0 
-        ? ((_tamamlanan / _toplamOturum) * 100).toInt() 
+    int tamamlamaOrani = _toplamOturum > 0
+        ? ((_tamamlanan / _toplamOturum) * 100).toInt()
         : 0;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFFF5F2EA),
-        title: const Text("DURUM ÖZETİ", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E4035), fontSize: 18, letterSpacing: 1)),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const SizedBox(width: 24),
+            Text(
+              "DURUM ÖZETİ",
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF2E4035),
+                fontSize: 18,
+                letterSpacing: 1,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.grey),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: const Color(0xFFF5F2EA),
+                    title: const Center(
+                      child: Text(
+                        "SIFIRLA",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                    content: const Text(
+                      "Tüm istatistiklerin silinecek. Bu işlem geri alınamaz.",
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          "VAZGEÇ",
+                          style: TextStyle(color: Color(0xFF2E4035)),
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () async {
+                          await DataManager.verileriSifirla();
+                          if (!context.mounted) return;
+                          Navigator.pop(ctx);
+                          Navigator.pop(context);
+                          _verileriGuncelle();
+                        },
+                        child: const Text("SİL"),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Divider(),
             const SizedBox(height: 10),
-            _buildStatRow("Odak Süresi", _formatSaatDk(_toplamSureSn), isBold: true),
+            _buildStatRow(
+              "Odak Süresi",
+              _formatSaatDk(_toplamSureSn),
+              isBold: true,
+            ),
             _buildStatRow("Oturumlar", "$_toplamOturum Kez"),
             const SizedBox(height: 10),
             _buildStatRow("En Uzun Odak", _formatSaatDk(_enUzunOdak)),
@@ -149,9 +244,15 @@ class _KarsilamaEkraniState extends State<KarsilamaEkrani> {
           Center(
             child: TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("KAPAT", style: TextStyle(color: Color(0xFFD65A31), fontWeight: FontWeight.bold)),
+              child: Text(
+                "KAPAT",
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFFD65A31),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -163,12 +264,21 @@ class _KarsilamaEkraniState extends State<KarsilamaEkrani> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF5C5B57), fontSize: 14)),
-          Text(value, style: TextStyle(
-            color: const Color(0xFF2E4035), 
-            fontWeight: isBold ? FontWeight.w900 : FontWeight.bold,
-            fontSize: isBold ? 18 : 14
-          )),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: const Color(0xFF5C5B57),
+              fontSize: 14,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              color: const Color(0xFF2E4035),
+              fontWeight: isBold ? FontWeight.w900 : FontWeight.bold,
+              fontSize: isBold ? 18 : 14,
+            ),
+          ),
         ],
       ),
     );
@@ -177,92 +287,202 @@ class _KarsilamaEkraniState extends State<KarsilamaEkrani> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F2EA),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(flex: 2),
-              // --- YENİ BAŞLIK (LOGO TARZI) ---
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  // Ortak stiller (Font ailesi, boyut, renk, italiklik)
-                  style: const TextStyle(
-                    fontFamily: 'Serif',
-                    fontStyle: FontStyle.italic,
-                    fontSize: 56,
-                    letterSpacing: -2.0,
-                    color: Color(0xFF2E4035), // Koyu yeşil ana renk
+        child: Stack(
+          children: [
+            // 1. BLOG BUTONU (SAĞ ÜST KÖŞE)
+            Positioned(
+              top: 10,
+              right: 20,
+              child: TextButton.icon(
+                onPressed: _blogAc,
+                icon: const Icon(
+                  Icons.article_outlined,
+                  color: Color(0xFF2E4035),
+                  size: 20,
+                ),
+                label: Text(
+                  "Blog",
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF2E4035),
                   ),
-                  children: const <TextSpan>[
-                    // 1. Kısım: Hokus (Daha zarif ve ince)
-                    TextSpan(
-                      text: 'Hokus',
-                      style: TextStyle(fontWeight: FontWeight.w400), // Normal kalınlık
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E4035).withOpacity(0.05),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                ),
+              ),
+            ),
+
+            // 2. ORTA ALAN (LOGO + MASKOT + SLOGAN)
+            Column(
+              children: [
+                const Spacer(flex: 2), // Üst boşluk
+                // MASKOT GÖRSELİ (Daire İçinde)
+                Container(
+                  width: 180,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(
+                      0xFF2E4035,
+                    ).withOpacity(0.05), // Çok hafif yeşil arkaplan
+                  ),
+                  child: Center(
+                    child: Image.asset(
+                      'assets/images/tavsan_ikon.png', // Tavşanı buraya koyduk
+                      width: 100,
+                      height: 100,
                     ),
-                    // 2. Kısım: Focus (Vurgulu ve kalın - Odak noktası)
-                    TextSpan(
-                      text: 'Focus',
-                      style: TextStyle(fontWeight: FontWeight.w900), // Ekstra kalın
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // LOGO (HokusFocus)
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontFamily: 'Serif',
+                      fontStyle: FontStyle.italic,
+                      fontSize: 48, // Biraz küçülttük, çok bağırmasın
+                      letterSpacing: -1.0,
+                      color: Color(0xFF2E4035),
                     ),
-                  ],
-                ),
-              ),
-              // -------------------------------
-              const SizedBox(height: 40),
-              const Text(
-                "Odaklanmak için uğraşma.\nSen sadece ritme eşlik et,\nZihnin odaklanmak zorunda kalacak...",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Serif', 
-                  fontStyle: FontStyle.italic, 
-                  fontSize: 18, 
-                  color: Color(0xFF5C5B57), 
-                  height: 1.5, 
-                  fontWeight: FontWeight.w400
-                ),
-              ),
-              const Spacer(flex: 3),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context, 
-                      MaterialPageRoute(builder: (context) => const KurulumEkrani())
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E4035),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 22),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    elevation: 5,
-                    shadowColor: const Color(0x40000000),
-                  ),
-                  child: const Text("BAŞLA", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 4)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: _istatistikleriGoster,
-                  icon: const Icon(Icons.bar_chart, color: Color(0xFF2E4035)),
-                  label: const Text("İSTATİSTİKLER", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1, color: Color(0xFF2E4035))),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    backgroundColor: Colors.transparent,
+                    children: const <TextSpan>[
+                      TextSpan(
+                        text: 'Hokus',
+                        style: TextStyle(fontWeight: FontWeight.w400),
+                      ),
+                      TextSpan(
+                        text: 'Focus',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ],
                   ),
                 ),
+
+                const SizedBox(height: 20),
+
+                // SLOGAN
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                  child: Text(
+                    "Zihnin odaklanmak zorunda kalacak...",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      // Sloganı daha okunaklı yaptık
+                      fontSize: 16,
+                      color: const Color(0xFFA09E96),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+
+                const Spacer(flex: 3), // Alt boşluk dengesi
+              ],
+            ),
+
+            // 3. ALT AKSİYON ALANI (BUTONLAR)
+            Positioned(
+              bottom: 30,
+              left: 24,
+              right: 24,
+              child: Column(
+                children: [
+                  // BAŞLA BUTONU (Ana Aksiyon)
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2E4035).withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const KurulumEkrani(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E4035),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 20,
+                        ), // Yüksekliği 20 yaptık
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        "BAŞLA",
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 3,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // İSTATİSTİKLER (İkincil Aksiyon - Buton Görünümlü Text)
+                  TextButton.icon(
+                    onPressed: _istatistikleriGoster,
+                    icon: const Icon(
+                      Icons.bar_chart_rounded,
+                      color: Color(0xFF2E4035),
+                    ),
+                    label: Text(
+                      "İstatistikler",
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF2E4035),
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 20,
+                      ),
+                      backgroundColor: Colors.transparent, // Arkaplan yok
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+                  // Versiyon
+                  Text(
+                    "v1.2",
+                    style: GoogleFonts.poppins(
+                      color: const Color(0x4DA09E96),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              const Spacer(flex: 1),
-              const Text("v1.2", style: TextStyle(color: Color(0x4DA09E96), fontWeight: FontWeight.bold, fontSize: 20)),
-              const SizedBox(height: 20),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -279,13 +499,16 @@ class KurulumEkrani extends StatefulWidget {
   State<KurulumEkrani> createState() => _KurulumEkraniState();
 }
 
-class _KurulumEkraniState extends State<KurulumEkrani> with SingleTickerProviderStateMixin {
+class _KurulumEkraniState extends State<KurulumEkrani>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _dkController = TextEditingController();
   final TextEditingController _snController = TextEditingController();
   final TextEditingController _toplamDkController = TextEditingController();
-  final TextEditingController _hedefAdetHesapController = TextEditingController();
+  final TextEditingController _hedefAdetHesapController =
+      TextEditingController();
   final TextEditingController _hedefController = TextEditingController();
+  bool _sonsuzMod = false;
 
   @override
   void initState() {
@@ -305,37 +528,47 @@ class _KurulumEkraniState extends State<KurulumEkrani> with SingleTickerProvider
   }
 
   void _baslat() {
-    // 1. Önce Hedef Sayısını alıyoruz (Bölme işlemi için gerekli)
-    int hedef = int.tryParse(_hedefController.text.isNotEmpty ? _hedefController.text : _hedefAdetHesapController.text) ?? 1;
-    
-    // Hedef 0 veya boş girildiyse hatayı önlemek için en az 1 yapalım
-    if (hedef < 1) hedef = 1;
+    // YENİ MANTIK: Eğer sonsuz mod açıksa hedef 0 olsun.
+    // Değilse kutuya girilen değeri al, boşsa 1 kabul et.
+    int hedef = _sonsuzMod
+        ? 0
+        : (int.tryParse(
+                _hedefController.text.isNotEmpty
+                    ? _hedefController.text
+                    : _hedefAdetHesapController.text,
+              ) ??
+              1);
+
+    // Sonsuz mod değilse ve hedef 1'den küçük girildiyse hata olmasın, en az 1 yapalım
+    if (!_sonsuzMod && hedef < 1) hedef = 1;
 
     double birimSureDk = 0.0;
-    
+
     if (_tabController.index == 0) {
-       // --- TAB 1: BİRİM SÜRE MODU ---
-       // Kullanıcı "1 tanesi kaç dk sürer" onu giriyor. Aynen alıyoruz.
-       double dk = double.tryParse(_dkController.text) ?? 0;
-       double sn = double.tryParse(_snController.text) ?? 0;
-       birimSureDk = dk + (sn / 60); 
+      // --- TAB 1: BİRİM SÜRE MODU ---
+      double dk = double.tryParse(_dkController.text) ?? 0;
+      double sn = double.tryParse(_snController.text) ?? 0;
+      birimSureDk = dk + (sn / 60);
     } else {
-       // --- TAB 2: TOPLAM SÜRE MODU (DÜZELTME BURADA) ---
-       // Kullanıcı "Toplam 30 dk sürecek" dediyse ve hedef 10 ise;
-       // Birim süre = 30 / 10 = 3 dk olmalı.
-       double toplamDk = double.tryParse(_toplamDkController.text) ?? 0.0;
-       birimSureDk = toplamDk / hedef;
+      // --- TAB 2: TOPLAM SÜRE MODU ---
+      double toplamDk = double.tryParse(_toplamDkController.text) ?? 0.0;
+      // Sonsuz modda (hedef 0 ise) toplam süreyi bölemeyiz, o yüzden bir varsayılan değer (0.5) atıyoruz.
+      // Zaten sonsuz modda birim süre kullanıcı tarafından girilmediyse arka planda hesaplanması gerekmez.
+      birimSureDk = (hedef > 0) ? toplamDk / hedef : 0.5;
     }
 
-    // Kokpit ekranına her zaman hesaplanmış "Birim Süre"yi gönderiyoruz.
+    // Güvenlik önlemi: Süre 0 veya eksi çıkarsa varsayılan ata
+    if (birimSureDk <= 0) birimSureDk = 0.5;
+
     Navigator.pushReplacement(
-      context, 
+      context,
       MaterialPageRoute(
         builder: (context) => KokpitEkrani(
           hedefSureDk: birimSureDk,
-          hedefMiktar: hedef,
-        )
-      )
+          hedefMiktar:
+              hedef, // Burası artık 0 gidebilecek (Sonsuz Mod için şifremiz bu)
+        ),
+      ),
     );
   }
 
@@ -349,7 +582,7 @@ class _KurulumEkraniState extends State<KurulumEkrani> with SingleTickerProvider
         setState(() {
           _dkController.text = (value ~/ 60).toString();
           _snController.text = (value % 60).toString();
-          _tabController.animateTo(0); 
+          _tabController.animateTo(0);
         });
       }
     });
@@ -358,15 +591,26 @@ class _KurulumEkraniState extends State<KurulumEkrani> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true, 
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF2E4035)),
-          onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const KarsilamaEkrani())),
+          onPressed: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const KarsilamaEkrani()),
+          ),
         ),
-        title: const Text("KALİBRASYON", style: TextStyle(color: Color(0xFF2E4035), fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 2)),
+        title: const Text(
+          "KALİBRASYON",
+          style: TextStyle(
+            color: Color(0xFF2E4035),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            letterSpacing: 2,
+          ),
+        ),
         centerTitle: true,
       ),
       body: GestureDetector(
@@ -374,41 +618,59 @@ class _KurulumEkraniState extends State<KurulumEkrani> with SingleTickerProvider
         child: Column(
           children: [
             const SizedBox(height: 20),
-            
+
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
               padding: const EdgeInsets.all(4.0),
               decoration: BoxDecoration(
-                color: Colors.white, 
-                borderRadius: BorderRadius.circular(30), 
-                border: Border.all(color: const Color(0x1A2E4035))
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: const Color(0x1A2E4035)),
               ),
               child: TabBar(
                 controller: _tabController,
                 indicator: BoxDecoration(
-                  color: const Color(0xFF2E4035), 
+                  color: const Color(0xFF2E4035),
                   borderRadius: BorderRadius.circular(26),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))]
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 dividerColor: Colors.transparent,
                 labelColor: Colors.white,
                 unselectedLabelColor: const Color(0xFFA09E96),
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1),
-                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, letterSpacing: 1),
-                labelPadding: EdgeInsets.zero, 
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  letterSpacing: 1,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  letterSpacing: 1,
+                ),
+                labelPadding: EdgeInsets.zero,
                 tabs: const [
-                  Tab(child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20.0), 
-                    child: Text("BİRİM SÜRE"), 
-                  )),
-                  Tab(child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Text("TOPLAM SÜRE"),
-                  )),
+                  Tab(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.0),
+                      child: Text("BİRİM SÜRE"),
+                    ),
+                  ),
+                  Tab(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.0),
+                      child: Text("TOPLAM SÜRE"),
+                    ),
+                  ),
                 ],
               ),
             ),
-            
+
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -418,28 +680,101 @@ class _KurulumEkraniState extends State<KurulumEkrani> with SingleTickerProvider
                     child: Column(
                       children: [
                         const SizedBox(height: 20),
-                        const Text("1 birim (sayfa/soru) ne kadar sürer?", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF5C5B57))),
+                        const Text(
+                          "1 birim (sayfa/soru) ne kadar sürer?",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Color(0xFF5C5B57)),
+                        ),
                         const SizedBox(height: 20),
                         Row(
                           children: [
-                            Expanded(child: TextField(controller: _dkController, keyboardType: TextInputType.number, textAlign: TextAlign.center, decoration: _inputDecoration("DK"))),
+                            Expanded(
+                              child: TextField(
+                                controller: _dkController,
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                decoration: _inputDecoration("DK"),
+                              ),
+                            ),
                             const SizedBox(width: 10),
-                            const Text(":", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                            const Text(
+                              ":",
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             const SizedBox(width: 10),
-                            Expanded(child: TextField(controller: _snController, keyboardType: TextInputType.number, textAlign: TextAlign.center, decoration: _inputDecoration("SN"))),
+                            Expanded(
+                              child: TextField(
+                                controller: _snController,
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                decoration: _inputDecoration("SN"),
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 10),
                         TextButton.icon(
-                          onPressed: _olcumYap, 
-                          icon: const Icon(Icons.timer, size: 18), 
-                          label: const Text("Bilmiyorum, Şimdi Ölç", style: TextStyle(fontWeight: FontWeight.bold)), 
-                          style: TextButton.styleFrom(foregroundColor: const Color(0xFFD65A31)),
+                          onPressed: _olcumYap,
+                          icon: const Icon(Icons.timer, size: 18),
+                          label: const Text(
+                            "Bilmiyorum, Şimdi Ölç",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFD65A31),
+                          ),
                         ),
                         const SizedBox(height: 30),
-                        const Align(alignment: Alignment.centerLeft, child: Text("Hedef Miktar", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E4035)))),
-                        const SizedBox(height: 8),
-                        TextField(controller: _hedefController, keyboardType: TextInputType.number, textAlign: TextAlign.center, decoration: _inputDecoration("Hedef Soru/Sayfa Sayısı")),
+
+                        // --- YENİ EKLENEN KISIM: SWITCH ---
+                        SwitchListTile(
+                          title: const Text(
+                            "Hedefsiz (Sonsuz) Mod",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2E4035),
+                            ),
+                          ),
+                          subtitle: const Text(
+                            "Sınır yok, sen durdurana kadar devam eder.",
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          value: _sonsuzMod,
+                          activeThumbColor: const Color(0xFFD65A31),
+                          contentPadding: EdgeInsets.zero,
+                          onChanged: (val) {
+                            setState(() {
+                              _sonsuzMod = val;
+                            });
+                          },
+                        ),
+
+                        // Eğer sonsuz mod KAPALIYSA hedef kutusunu göster (Gizle/Göster mantığı)
+                        if (!_sonsuzMod) ...[
+                          const SizedBox(height: 10),
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              "Hedef Miktar",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2E4035),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _hedefController,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            decoration: _inputDecoration(
+                              "Hedef Soru/Sayfa Sayısı",
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -449,38 +784,96 @@ class _KurulumEkraniState extends State<KurulumEkrani> with SingleTickerProvider
                     child: Column(
                       children: [
                         const SizedBox(height: 20),
-                        const Text("Bu oturum toplam ne kadar sürer?", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF5C5B57))),
+                        const Text(
+                          "Bu oturum toplam ne kadar sürer?",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Color(0xFF5C5B57)),
+                        ),
                         const SizedBox(height: 30),
-                        const Align(alignment: Alignment.centerLeft, child: Text("Oturum Süresi", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E4035)))),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "Oturum Süresi",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2E4035),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        TextField(controller: _toplamDkController, keyboardType: TextInputType.number, textAlign: TextAlign.center, decoration: _inputDecoration("DK")),
+                        TextField(
+                          controller: _toplamDkController,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          decoration: _inputDecoration("DK"),
+                        ),
                         const SizedBox(height: 20),
-                        const Align(alignment: Alignment.centerLeft, child: Text("Hedef Miktar", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E4035)))),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "Hedef Miktar",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2E4035),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        TextField(controller: _hedefAdetHesapController, keyboardType: TextInputType.number, textAlign: TextAlign.center, decoration: _inputDecoration("Hedef Soru/Sayfa Sayısı")),
+                        TextField(
+                          controller: _hedefAdetHesapController,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          decoration: _inputDecoration(
+                            "Hedef Soru/Sayfa Sayısı",
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             Padding(
               padding: const EdgeInsets.all(24.0),
-              child: SizedBox(
+              child: Container(
                 width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(
+                        0xFF2E4035,
+                      ).withOpacity(0.3), // Hafif yeşil gölge
+                      blurRadius: 20, // Gölgenin yayılması (Flu)
+                      offset: const Offset(0, 10), // Gölgenin aşağı kayması
+                    ),
+                  ],
+                ),
                 child: ElevatedButton(
                   onPressed: _baslat,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E4035), foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    backgroundColor: const Color(0xFF2E4035),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 22),
+                    // Köşeleri daha yuvarlak yapıyoruz
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 0, // Kendi gölgesini kapattık, özel gölge verdik
                   ),
-                  child: const Text("FOCUS", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                  child: Text(
+                    "FOCUS",
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                  ),
                 ),
               ),
             ),
-             const SizedBox(height: 10),
+            const SizedBox(height: 10),
           ],
         ),
       ),
@@ -489,11 +882,27 @@ class _KurulumEkraniState extends State<KurulumEkrani> with SingleTickerProvider
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
-      hintText: hint, 
-      hintStyle: TextStyle(color: const Color(0xFFA09E96).withValues(alpha: 0.5), fontSize: 14),
-      filled: true, fillColor: Colors.white,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      contentPadding: const EdgeInsets.symmetric(vertical: 20),
+      hintText: hint,
+      hintStyle: GoogleFonts.poppins(
+        color: const Color(0xFFA09E96).withOpacity(0.5),
+        fontSize: 14,
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      // Kenarlık çizgilerini siliyoruz (BorderSide.none), çünkü gölgeyle ayıracağız
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: const BorderSide(color: Color(0xFF2E4035), width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
     );
   }
 }
@@ -518,9 +927,13 @@ class _OlcumDialogState extends State<OlcumDialog> {
 
   void _baslatBitir() {
     if (!_basladi) {
-      setState(() { _basladi = true; });
+      setState(() {
+        _basladi = true;
+      });
       _stopwatch.start();
-      _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) { setState(() {}); });
+      _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+        setState(() {});
+      });
     } else {
       _stopwatch.stop();
       _timer.cancel();
@@ -530,22 +943,34 @@ class _OlcumDialogState extends State<OlcumDialog> {
 
   @override
   Widget build(BuildContext context) {
-    String sureStr = "${(_stopwatch.elapsed.inMinutes % 60).toString().padLeft(2, '0')}:${(_stopwatch.elapsed.inSeconds % 60).toString().padLeft(2, '0')}";
-    
+    String sureStr =
+        "${(_stopwatch.elapsed.inMinutes % 60).toString().padLeft(2, '0')}:${(_stopwatch.elapsed.inSeconds % 60).toString().padLeft(2, '0')}";
+
     return AlertDialog(
       backgroundColor: const Color(0xFFF5F2EA),
-      title: const Text("SÜRE ÖLÇÜMÜ", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E4035))),
+      title: const Text(
+        "SÜRE ÖLÇÜMÜ",
+        textAlign: TextAlign.center,
+        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E4035)),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            !_basladi 
-            ? "Şimdi 1 sayfa/soru çözmeye başla ve butona bas. Bitince tekrar bas."
-            : "İşin bitince durdur.",
+            !_basladi
+                ? "Şimdi 1 sayfa/soru çözmeye başla ve butona bas. Bitince tekrar bas."
+                : "İşin bitince durdur.",
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
-          Text(sureStr, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, fontFamily: 'Courier')),
+          Text(
+            sureStr,
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Courier',
+            ),
+          ),
         ],
       ),
       actions: [
@@ -553,27 +978,29 @@ class _OlcumDialogState extends State<OlcumDialog> {
           child: ElevatedButton(
             onPressed: _baslatBitir,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _basladi ? const Color(0xFFD65A31) : const Color(0xFF2E4035),
-              foregroundColor: Colors.white
+              backgroundColor: _basladi
+                  ? const Color(0xFFD65A31)
+                  : const Color(0xFF2E4035),
+              foregroundColor: Colors.white,
             ),
             child: Text(_basladi ? "BİTTİ (DURDUR)" : "BAŞLA"),
           ),
-        )
+        ),
       ],
     );
   }
 }
 
 // ----------------------------------------
-// 2. EKRAN: KOKPİT (YENİ İKONLU VE DÖNÜŞLÜ)
+// 2. EKRAN: KOKPİT (GÜNCELLENMİŞ ZAMAN HAKİMİYETİ)
 // ----------------------------------------
 class KokpitEkrani extends StatefulWidget {
-  final double hedefSureDk; 
-  final int hedefMiktar; 
+  final double hedefSureDk;
+  final int hedefMiktar;
 
   const KokpitEkrani({
-    super.key, 
-    required this.hedefSureDk, 
+    super.key,
+    required this.hedefSureDk,
     required this.hedefMiktar,
   });
 
@@ -581,18 +1008,25 @@ class KokpitEkrani extends StatefulWidget {
   State<KokpitEkrani> createState() => _KokpitEkraniState();
 }
 
-class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMixin {
+class _KokpitEkraniState extends State<KokpitEkrani>
+    with TickerProviderStateMixin {
   late Ticker _ticker;
-  Duration _oyunZamani = Duration.zero; 
-  bool _ilkEtkilesimYapildi = false; 
-  DateTime? _tavsanBaslangicReferansi; 
+  Duration _oyunZamani = Duration.zero;
+  bool _ilkEtkilesimYapildi = false;
+  DateTime? _tavsanBaslangicReferansi;
   int _tamamlananAdet = 0;
   final Stopwatch _gercekSureKronometresi = Stopwatch();
   bool _oyunBitti = false;
   bool _duraklatildi = false;
   final FocusNode _klavyeOdagi = FocusNode();
 
-  double _toplamUyumlulukPuani = 0.0; 
+  // Mola sürelerini burada toplayacağız
+  Duration _toplamMolaSuresi = Duration.zero;
+
+  // --- YENİ SİSTEM: SAF HAKİMİYET DEĞİŞKENLERİ ---
+  // Eski puan değişkenini sildik, yerine bunları koyduk.
+  Duration _gecikmeSuresi = Duration.zero;
+  DateTime? _gecikmeBaslangicZamani;
 
   late AnimationController _efektController;
   late Animation<double> _efektOpaklik;
@@ -601,43 +1035,69 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    
-    _efektController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
-    _efektOpaklik = Tween<double>(begin: 0.8, end: 0.0).animate(CurvedAnimation(parent: _efektController, curve: Curves.easeOut));
-    _efektHareket = Tween<double>(begin: 0.0, end: -40.0).animate(CurvedAnimation(parent: _efektController, curve: Curves.easeOut));
+    WakelockPlus.enable();
+
+    _efektController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _efektOpaklik = Tween<double>(
+      begin: 0.8,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _efektController, curve: Curves.easeOut));
+    _efektHareket = Tween<double>(
+      begin: 0.0,
+      end: -40.0,
+    ).animate(CurvedAnimation(parent: _efektController, curve: Curves.easeOut));
 
     _ticker = createTicker((elapsed) {
       if (_oyunBitti || _duraklatildi) return;
-      
+
       if (_tavsanBaslangicReferansi != null) {
         var simdi = DateTime.now();
         var gecenSure = simdi.difference(_tavsanBaslangicReferansi!);
-        
-        // --- YENİ MANTIK BAŞLANGICI ---
+
         // 1. Tavşanın doğal (süreye bağlı) yerini hesapla
         int birimMs = (widget.hedefSureDk * 60).toInt() * 1000;
         double rawProgress = gecenSure.inMilliseconds / birimMs;
         double tavsanKonum = rawProgress - 1.0;
-        
+
         // 2. Sınırı kontrol et (Senin konumun - 4.0)
         double altSinir = _tamamlananAdet - 4.0;
-        
-        // 3. Eğer tavşan sınırdan gerideyse, ZAMANI ileri sar!
+
+        // 3. Catch-Up
         if (tavsanKonum < altSinir) {
-          // Tavşanı zorla alt sınıra taşıyacak yeni süreyi hesapla
-          double hedefRaw = altSinir + 1.0; 
+          double hedefRaw = altSinir + 1.0;
           int hedefMs = (hedefRaw * birimMs).toInt();
-          
-          // Başlangıç referansını kaydır (Zaman borcunu sil)
-          _tavsanBaslangicReferansi = simdi.subtract(Duration(milliseconds: hedefMs));
-          
-          // Oyun zamanını güncelle
+          _tavsanBaslangicReferansi = simdi.subtract(
+            Duration(milliseconds: hedefMs),
+          );
           _oyunZamani = Duration(milliseconds: hedefMs);
         } else {
-           // Her şey yolundaysa normal akışa devam
-           _oyunZamani = gecenSure;
+          _oyunZamani = gecenSure;
         }
-        // --- YENİ MANTIK BİTİŞİ ---
+
+        // --- YENİ PUANLAMA MANTIĞI (TICKER İÇİNDE) ---
+        // Tavşan şu an beni geçti mi?
+        double benimKonum = _tamamlananAdet.toDouble();
+        double guncelTavsanKonumu = _tavsanAdetKonumu();
+
+        if (guncelTavsanKonumu > benimKonum) {
+          // Tavşan önde! Ceza sayacı başlasın.
+          if (_gecikmeBaslangicZamani == null) {
+            _gecikmeBaslangicZamani = DateTime.now();
+          }
+        } else {
+          // Tavşan arkada! Güvendeyiz.
+          if (_gecikmeBaslangicZamani != null) {
+            // Az önce gerideydik, şimdi yakaladık. O süreyi kumbaraya at.
+            Duration buGecikme = DateTime.now().difference(
+              _gecikmeBaslangicZamani!,
+            );
+            _gecikmeSuresi += buGecikme;
+            _gecikmeBaslangicZamani = null; // Sayacı sıfırla
+          }
+        }
 
         setState(() {}); // Ekranı yenile
         _hakemKontrolu();
@@ -651,37 +1111,222 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFFF5F2EA),
-        title: const Text("NASIL ÇALIŞIR?", style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF2E4035), letterSpacing: 1), textAlign: TextAlign.center),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.touch_app, size: 48, color: Color(0xFFD65A31)),
-            SizedBox(height: 20),
-            // 1. Madde
-            Text("1. Her birim (sayfa/soru) bittiğinde ekrana dokun.", style: TextStyle(fontSize: 16, color: Color(0xFF2E4035)), textAlign: TextAlign.center),
-            SizedBox(height: 15),
-            // 2. Madde
-            Text("2. Tavşanla bağını koparma.", style: TextStyle(fontSize: 16, color: Color(0xFF2E4035)), textAlign: TextAlign.center),
-            SizedBox(height: 20),
-            // Alt Bilgi
-            Text("Süre sen 'HAZIRIM' diyince başlayacak.", style: TextStyle(fontSize: 13, color: Colors.grey, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
-          ],
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F2EA),
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 25,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. BAŞLIK (TOMBİKLEŞTİRİLDİ)
+              const Text(
+                "NASIL ÇALIŞIR?",
+                style: TextStyle(
+                  fontWeight: FontWeight.w900, // En kalın
+                  fontSize: 28, // Boyutu büyüttük (26 -> 28)
+                  color: Color(0xFF2E4035),
+                  letterSpacing: 0.5, // Harfleri sıkılaştırdık (Tombik efekt)
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 32),
+
+              // 2. GÖRSEL DÖNGÜ (OKLAR VE TAVŞAN SABİT)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ADIM 1: ÇÖZ/OKU
+                  _buildRehberAdim(
+                    iconWidget: const Icon(
+                      Icons.auto_stories,
+                      size: 28,
+                      color: Color(0xFF2E4035),
+                    ),
+                    title: "ÇÖZ / OKU",
+                    desc: "İşini tamamla",
+                  ),
+
+                  // OK 1 (Hizalı)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: Icon(
+                      Icons.arrow_right_alt_rounded,
+                      color: Color(0xFFD65A31),
+                      size: 32,
+                    ),
+                  ),
+
+                  // ADIM 2: DOKUN
+                  _buildRehberAdim(
+                    iconWidget: const Icon(
+                      Icons.touch_app_rounded,
+                      size: 28,
+                      color: Color(0xFFD65A31),
+                    ),
+                    title: "DOKUN",
+                    desc: "Ekrana bas",
+                    highlight: true,
+                  ),
+
+                  // OK 2 (Hizalı)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 16),
+                    child: Icon(
+                      Icons.arrow_right_alt_rounded,
+                      color: Color(0xFFD65A31),
+                      size: 32,
+                    ),
+                  ),
+
+                  // ADIM 3: YAKALA
+                  _buildRehberAdim(
+                    iconWidget: Image.asset(
+                      'assets/images/tavsan_ikon.png',
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.contain,
+                    ),
+                    title: "ÖNDE KAL",
+                    desc: "Tavşanı Geç",
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+
+              // 3. ALT BİLGİ (Kendi cümleni yazana kadar bu kalsın)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  "İşin bitince ekrana dokun; gerideysen yetiş, öndeysen fark at.",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF5C5B57),
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // 4. BUTON (ARTIK "BAS BANA" DİYOR) 🔘🔥
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  // Bu gölge butonu havaya kaldırır (3D etkisi)
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2E4035).withValues(alpha: 0.4),
+                      blurRadius: 15,
+                      offset: const Offset(0, 8), // Gölge aşağı düşer
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _oyunuBaslat();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E4035),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 22,
+                    ), // Daha yüksek buton
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0, // Kendi gölgesini kapattık, özel gölge verdik
+                  ),
+                  child: const Text(
+                    "HAZIRIM",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                      fontSize: 18, // Yazıyı büyüttük
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        actions: [
-          Center(
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _oyunuBaslat();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E4035), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)),
-              child: const Text("HAZIRIM", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
-            ),
-          )
-        ],
       ),
+    );
+  }
+
+  // --- YARDIMCI WIDGET (SABİT 64px DAİRE + GENİŞ İÇ ALAN) ---
+  Widget _buildRehberAdim({
+    required Widget iconWidget,
+    required String title,
+    required String desc,
+    bool highlight = false,
+  }) {
+    return Column(
+      children: [
+        Container(
+          width: 64, // Sabit Genişlik
+          height: 64, // Sabit Yükseklik
+          padding: const EdgeInsets.all(8), // Tavşana yer açmak için az padding
+          decoration: BoxDecoration(
+            color: highlight
+                ? const Color(0xFFD65A31).withValues(alpha: 0.1)
+                : Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: highlight ? const Color(0xFFD65A31) : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: [
+              if (!highlight)
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+            ],
+          ),
+          child: Center(child: iconWidget),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 12,
+            color: highlight
+                ? const Color(0xFFD65A31)
+                : const Color(0xFF2E4035),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          desc,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Color(0xFFA09E96),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -689,12 +1334,10 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
     setState(() {
       _tavsanBaslangicReferansi = DateTime.now();
       _oyunZamani = Duration.zero;
-      
-      // Dakikayı saniyeye çevirip avans olarak ekliyoruz
-      
-      
-      // BURASI ÖNEMLİ: İlk etkileşimi FALSE yapıyoruz ki rüzgar izi hemen çıkmasın!
-      _ilkEtkilesimYapildi = false; 
+      _ilkEtkilesimYapildi = false;
+      // Yeni sayaçları sıfırla
+      _gecikmeSuresi = Duration.zero;
+      _gecikmeBaslangicZamani = null;
     });
 
     _gercekSureKronometresi.start();
@@ -704,6 +1347,7 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
 
   @override
   void dispose() {
+    WakelockPlus.disable();
     _ticker.dispose();
     _efektController.dispose();
     _klavyeOdagi.dispose();
@@ -712,94 +1356,279 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
 
   void _hakemKontrolu() {
     if (_oyunZamani.inMilliseconds == 0 || _oyunBitti) return;
-
-    // 1. Tavşanın güncel konumunu al
     double tavsanKonum = _tavsanAdetKonumu();
-    
-    // 2. Senin konumun
     double benimKonum = _tamamlananAdet.toDouble();
-
-    // 3. Tavşan ne kadar önde?
     double fark = tavsanKonum - benimKonum;
 
-    // 4. Eğer Tavşan 4 birimden (180 derece) fazla fark attıysa DÜDÜĞÜ ÇAL!
     if (fark >= 4.0) {
-      // İşte burası senin o "sarı kutucuklu" görseldeki kodunu tetikler.
       _oyunuBitir(kazandiMi: false, baslik: "KOPTUN");
     }
   }
 
-  void _cikisSor() {
+  Future<bool> _cikisIstegi() async {
+    _ticker.stop();
     _gercekSureKronometresi.stop();
-    setState(() { _duraklatildi = true; });
 
-    showDialog(
+    // MOLA GÜVENLİĞİ: Eğer şu an ceza yiyorsan, sayacı dondur.
+    // Diyalogda geçen süre ceza olarak yazılmasın.
+    if (_gecikmeBaslangicZamani != null) {
+      Duration buGecikme = DateTime.now().difference(_gecikmeBaslangicZamani!);
+      _gecikmeSuresi += buGecikme;
+      _gecikmeBaslangicZamani = null;
+    }
+
+    DateTime diyalogAcilisZamani = DateTime.now();
+    bool sonsuzMod = widget.hedefMiktar == 0;
+
+    String baslik = sonsuzMod ? "BİTİRİYOR MUSUN?" : "KAÇACAK MISIN?";
+    String icerik = sonsuzMod
+        ? "Gayet iyi ilerledin. Oturumu şimdi sonlandırmak ister misin?"
+        : "Oturumu sonlandırmak istediğine emin misin?";
+
+    String negatifButon = sonsuzMod ? "Evet, Bitir" : "Evet, gitmem gerek";
+    Color baslikRengi = sonsuzMod
+        ? const Color(0xFF2E4035)
+        : const Color(0xFFD65A31);
+
+    bool? cikisYapilsinMi = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFFF5F2EA),
-        title: const Text("KAÇACAK MISIN?", style: TextStyle(color: Color(0xFFD65A31), fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-        content: const Text("Oturumu sonlandırmak istediğine emin misin?", textAlign: TextAlign.center),
-        actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              TextButton(
-                onPressed: () {
-                  _gercekSureKronometresi.start();
-                  if (_ilkEtkilesimYapildi && _tavsanBaslangicReferansi != null) {
-                      _tavsanBaslangicReferansi = DateTime.now().subtract(_oyunZamani);
-                  }
-                  setState(() { _duraklatildi = false; });
-                  Navigator.pop(context);
-                  _klavyeOdagi.requestFocus();
-                },
-                child: const Text("HAYIR", style: TextStyle(color: Color(0xFF2E4035), fontWeight: FontWeight.bold)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD65A31), foregroundColor: Colors.white),
-                onPressed: () {
-                  Navigator.pop(context); 
-                  _oyunuBitir(kazandiMi: false, baslik: "OTURUM SONA ERDİ");
-                },
-                child: const Text("EVET"),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F2EA),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
             ],
-          )
-        ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                baslik,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: baslikRengi,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                icerik,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  color: const Color(0xFF5C5B57),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E4035),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 5,
+                  ),
+                  child: Text(
+                    "HAYIR, DEVAM ET",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFA09E96),
+                ),
+                child: Text(
+                  negatifButon,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+
+    if (cikisYapilsinMi == true) {
+      _oyunuBitir(
+        kazandiMi: sonsuzMod ? true : false,
+        baslik: sonsuzMod ? "OTURUM TAMAMLANDI" : "OTURUM SONA ERDİ",
+      );
+      return true;
+    } else {
+      if (_tavsanBaslangicReferansi != null) {
+        Duration beklemeSuresi = DateTime.now().difference(diyalogAcilisZamani);
+        _tavsanBaslangicReferansi = _tavsanBaslangicReferansi!.add(
+          beklemeSuresi,
+        );
+        _toplamMolaSuresi += beklemeSuresi;
+      }
+      _ticker.start();
+      _gercekSureKronometresi.start();
+      return false;
+    }
   }
 
   void _durdur() {
-    _gercekSureKronometresi.stop(); 
-    setState(() { _duraklatildi = true; });
-    
+    _gercekSureKronometresi.stop();
+    setState(() {
+      _duraklatildi = true;
+    });
+
+    // MOLA GÜVENLİĞİ: Ceza sayacını dondur
+    if (_gecikmeBaslangicZamani != null) {
+      Duration buGecikme = DateTime.now().difference(_gecikmeBaslangicZamani!);
+      _gecikmeSuresi += buGecikme;
+      _gecikmeBaslangicZamani = null;
+    }
+
+    DateTime molaBaslangic = DateTime.now();
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFFF5F2EA),
-        title: const Text("NEDEN DURDUN?", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-        content: const Text("Akış bozuldu. Odak soğuyor.\nBu yaptığın ritme ihanet.", textAlign: TextAlign.center),
-        actions: [
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E4035), foregroundColor: Colors.white),
-              onPressed: () {
-                if (_ilkEtkilesimYapildi) {
-                  _tavsanBaslangicReferansi = DateTime.now().subtract(_oyunZamani);
-                }
-                _gercekSureKronometresi.start(); 
-                setState(() { _duraklatildi = false; });
-                Navigator.pop(context);
-                _klavyeOdagi.requestFocus();
-              },
-              child: const Text("RİTME DÖN"),
-            ),
-          )
-        ],
-      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Timer.periodic(const Duration(seconds: 1), (timer) {
+              if (!context.mounted) {
+                timer.cancel();
+              } else {
+                setDialogState(() {});
+              }
+            });
+
+            Duration gecenSure = DateTime.now().difference(molaBaslangic);
+            String molaSuresiStr =
+                "${gecenSure.inMinutes.toString().padLeft(2, '0')}:${(gecenSure.inSeconds % 60).toString().padLeft(2, '0')}";
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F2EA),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.pause_circle_outline,
+                      size: 56,
+                      color: Color(0xFF2E4035),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "DURAKLATILDI",
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFD65A31),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      "Geçen Mola Süresi",
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFF5C5B57),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      molaSuresiStr,
+                      style: GoogleFonts.poppins(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2E4035),
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Tavşan seni bekliyor.",
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: const Color(0xFFA09E96),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (_tavsanBaslangicReferansi != null) {
+                            Duration buMolaSuresi = DateTime.now().difference(
+                              molaBaslangic,
+                            );
+                            _tavsanBaslangicReferansi =
+                                _tavsanBaslangicReferansi!.add(buMolaSuresi);
+                            _toplamMolaSuresi += buMolaSuresi;
+                          }
+                          _gercekSureKronometresi.start();
+                          setState(() {
+                            _duraklatildi = false;
+                          });
+                          Navigator.pop(context);
+                          _klavyeOdagi.requestFocus();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E4035),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: Text(
+                          "RİTME DÖN",
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -809,39 +1638,38 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
     if (!_ilkEtkilesimYapildi) {
       setState(() {
         _ilkEtkilesimYapildi = true;
-        // BURADA SIFIRLAMA YAPMIYORUZ! Tavşan koşmaya devam ediyor, biz sadece katıldık.
         _tamamlananAdet++;
-        _toplamUyumlulukPuani += 1.0; 
+        // Puan hesaplama artık burada yok.
       });
       _efektCalistir();
       return;
     }
 
-    double tavsanKonumu = _tavsanAdetKonumu();
-    double potansiyelYeniBen = (_tamamlananAdet + 1).toDouble();
-    double fark = (potansiyelYeniBen - tavsanKonumu).abs();
-    
-    double anlikPuan = (4.0 - fark) / 4.0;
-    if (anlikPuan < 0) anlikPuan = 0;
-    _toplamUyumlulukPuani += anlikPuan;
-
     _efektCalistir();
 
+    // Sadece Tavşan Hareketi ve Kontrolü (Puan Yok)
+    double tavsanKonumu = _tavsanAdetKonumu();
+    double potansiyelYeniBen = (_tamamlananAdet + 1).toDouble();
     double potansiyelFark = potansiyelYeniBen - tavsanKonumu;
 
+    // Catch-up
     if (potansiyelFark > 4.0) {
       double yeniTavsanKonumu = potansiyelYeniBen - 4.0;
-      int yeniMs = (yeniTavsanKonumu * (widget.hedefSureDk * 60).toInt() * 1000).floor();
-      _tavsanBaslangicReferansi = DateTime.now().subtract(Duration(milliseconds: yeniMs));
+      int yeniMs = (yeniTavsanKonumu * (widget.hedefSureDk * 60).toInt() * 1000)
+          .floor();
+
+      _tavsanBaslangicReferansi = DateTime.now().subtract(
+        Duration(milliseconds: yeniMs),
+      );
       _oyunZamani = Duration(milliseconds: yeniMs);
-      setState(() { _tamamlananAdet++; });
-      if (_tamamlananAdet >= widget.hedefMiktar) _oyunuBitir(kazandiMi: true, baslik: "HEDEF TAMAMLANDI");
-      return; 
     }
 
-    if (_tamamlananAdet < widget.hedefMiktar) {
-      setState(() { _tamamlananAdet++; });
-      if (_tamamlananAdet >= widget.hedefMiktar) _oyunuBitir(kazandiMi: true, baslik: "HEDEF TAMAMLANDI");
+    setState(() {
+      _tamamlananAdet++;
+    });
+
+    if (widget.hedefMiktar > 0 && _tamamlananAdet >= widget.hedefMiktar) {
+      _oyunuBitir(kazandiMi: true, baslik: "HEDEF TAMAMLANDI");
     }
   }
 
@@ -853,26 +1681,44 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
   void _oyunuBitir({required bool kazandiMi, required String baslik}) async {
     _oyunBitti = true;
     _ticker.stop();
-    _gercekSureKronometresi.stop(); 
+    _gercekSureKronometresi.stop();
 
-    // --- DEĞİŞİKLİK BURADA BAŞLIYOR ---
-    // Hesaplamada kullanılacak adet sayısını belirliyoruz.
-    // Eğer "KOPTUN" ise, başarısız olunan o son turu da paydaya (+1) ekliyoruz.
+    // --- FİNAL PUAN HESAPLAMASI (GÜNCELLENDİ) ---
+    // Eğer oyun biterken hala gerideysen, o son süreyi de ekle
+    if (_gecikmeBaslangicZamani != null) {
+      Duration buGecikme = DateTime.now().difference(_gecikmeBaslangicZamani!);
+      _gecikmeSuresi += buGecikme;
+    }
+
+    // Toplam geçen süre
+    double toplamGecenSureMs = _gercekSureKronometresi.elapsedMilliseconds
+        .toDouble();
+    if (toplamGecenSureMs <= 0) toplamGecenSureMs = 1;
+
+    // Toplam ceza süresi
+    double cezaMs = _gecikmeSuresi.inMilliseconds.toDouble();
+
+    // FORMÜL: 100 - ( (Geride Geçen Süre / Toplam Süre) * 100 )
+    double hamPuan = 100.0 - ((cezaMs / toplamGecenSureMs) * 100);
+
+    if (hamPuan < 0) hamPuan = 0;
+    if (hamPuan > 100) hamPuan = 100;
+
+    double akisPuaniYuzde = hamPuan; // Artık gerçek hakimiyet puanı bu.
+
+    // ---------------------------------------------
+
     int hesaplananAdet = _tamamlananAdet;
     if (baslik == "KOPTUN") {
       hesaplananAdet += 1;
     }
-    // --- DEĞİŞİKLİK BURADA BİTİYOR ---
 
     int gercekSaniye = _gercekSureKronometresi.elapsed.inSeconds;
-    
-    // DÜZELTME: Bölerken artık _tamamlananAdet yerine hesaplananAdet kullanıyoruz
-    double akisPuaniYuzde = hesaplananAdet > 0 ? (_toplamUyumlulukPuani / hesaplananAdet) * 100 : 0;
 
     await DataManager.oturumKaydet(
-      sureSn: gercekSaniye, 
-      tamamlandi: kazandiMi, 
-      akisPuani: akisPuaniYuzde
+      sureSn: gercekSaniye,
+      tamamlandi: kazandiMi,
+      akisPuani: akisPuaniYuzde,
     );
 
     String formatSureDetayli(int toplamSn) {
@@ -884,26 +1730,30 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
     }
 
     String gercekGecenSureStr = formatSureDetayli(gercekSaniye);
-    
-    // DÜZELTME: Ortalama hız hesaplarken de yeni adeti kullanıyoruz (Adil olması için)
+    String molaSuresiStr = formatSureDetayli(_toplamMolaSuresi.inSeconds);
     double ortalamaSn = hesaplananAdet > 0 ? gercekSaniye / hesaplananAdet : 0;
     String ortalamaHizStr = formatSureDetayli(ortalamaSn.round());
 
-    // Burası değişmedi, beklenen süre hala tamamlanana göre hesaplanıyor
-    int beklenenSaniye = (widget.hedefSureDk * 60).toInt() * _tamamlananAdet; 
+    int beklenenSaniye = (widget.hedefSureDk * 60).toInt() * _tamamlananAdet;
     int farkSaniye = beklenenSaniye - gercekSaniye;
     String performansMesaji = "";
-    
+
     if (baslik == "HEDEF TAMAMLANDI") {
-        if (farkSaniye > 0) {
-          performansMesaji = "Beklenenden ${formatSureDetayli(farkSaniye)} erken tamamladın.";
-        } else {
-          performansMesaji = "Beklenenden ${formatSureDetayli(farkSaniye.abs())} geç tamamladın.";
-        }
+      if (farkSaniye > 0) {
+        performansMesaji =
+            "Beklenenden ${formatSureDetayli(farkSaniye)} erken tamamladın.";
+      } else {
+        performansMesaji =
+            "Beklenenden ${formatSureDetayli(farkSaniye.abs())} geç tamamladın.";
+      }
     } else if (baslik == "KOPTUN") {
-        performansMesaji = "Odağın dağıldı. Tavşan seni geride bıraktı.";
+      performansMesaji = "Odağın dağıldı. Tavşan seni geride bıraktı.";
+    } else if (baslik == "OTURUM SONA ERDİ" || baslik == "PES ETTİN") {
+      performansMesaji = "Oturumu kendi isteğinle sonlandırdın.";
+    } else if (baslik == "OTURUM TAMAMLANDI") {
+      performansMesaji = "Sonsuz modda harika bir odaklanma sergiledin.";
     } else {
-        performansMesaji = "Oturumu kendi isteğinle sonlandırdın.";
+      performansMesaji = "Oturum sona erdi.";
     }
 
     if (!mounted) return;
@@ -911,68 +1761,221 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFFF5F2EA),
-        title: Text(baslik, style: TextStyle(color: (baslik == "HEDEF TAMAMLANDI") ? const Color(0xFF2E4035) : Colors.red, fontWeight: FontWeight.bold, fontSize: 22), textAlign: TextAlign.center),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(performansMesaji, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: (baslik == "HEDEF TAMAMLANDI") ? const Color(0xFF2E4035) : Colors.black54)),
-            const SizedBox(height: 20),
-            const Divider(),
-            const SizedBox(height: 10),
-            _buildSonucSatiri("Süre:", gercekGecenSureStr),
-            const SizedBox(height: 8),
-            _buildSonucSatiri("Ort. Hız:", ortalamaHizStr),
-            const SizedBox(height: 8),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const Text("Ritim Uyumu:", style: TextStyle(color: Color(0xFFA09E96))),
-                Text("%${akisPuaniYuzde.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFD65A31))),
-            ]),
-          ],
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F2EA),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: kazandiMi
+                      ? const Color(0xFF6B8E23).withValues(alpha: 0.1)
+                      : Colors.red.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  kazandiMi
+                      ? Icons.emoji_events_rounded
+                      : Icons.sentiment_dissatisfied_rounded,
+                  size: 48,
+                  color: kazandiMi ? const Color(0xFF6B8E23) : Colors.red,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text(
+                baslik,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: kazandiMi
+                      ? const Color(0xFF2E4035)
+                      : const Color(0xFFD65A31),
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                performansMesaji,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: const Color(0xFF5C5B57),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // SKOR KARTI - ZAMAN HAKİMİYETİ
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E4035),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      "ZAMAN HAKİMİYETİ",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "%${akisPuaniYuzde.toStringAsFixed(0)}",
+                      style: GoogleFonts.poppins(
+                        fontSize: 42,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 3'LÜ DETAY KUTUSU
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildResultBox(
+                      Icons.timer_outlined,
+                      gercekGecenSureStr,
+                      "Toplam Süre",
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildResultBox(
+                      Icons.pause_circle_outline,
+                      molaSuresiStr,
+                      "Mola Süresi",
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildResultBox(
+                      Icons.speed,
+                      ortalamaHizStr,
+                      "Ort. Hız",
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const KarsilamaEkrani(),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E4035),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    "ANA MENÜ",
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        actions: [
-          Center(
-            child: ElevatedButton(
-              onPressed: () { 
-                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const KarsilamaEkrani()), (route) => false); 
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E4035), foregroundColor: Colors.white),
-              child: const Text("TAMAM"),
+      ),
+    );
+  }
+
+  // Yardımcı widget
+  Widget _buildResultBox(IconData icon, String value, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x1A2E4035)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFFA09E96)),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: const Color(0xFF2E4035),
             ),
-          )
+          ),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 9,
+              color: const Color(0xFFA09E96),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSonucSatiri(String baslik, String deger) {
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(baslik, style: const TextStyle(color: Color(0xFFA09E96))),
-        Text(deger, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E4035))),
-    ]);
-  }
-
   double _tavsanAdetKonumu() {
-    // Tavşan konumu hesaplanırken "- 1.0" yaparak onu görsel olarak 1 tur geriye attık.
-    // Bu senin "1 birim süre Avans" mantığınla görselin eşleşmesini sağlıyor.
-    // Tavşan arkadan geliyor, sen 0. turdan başlıyorsun ama +1 birim süren var.
-    double rawProgress = _oyunZamani.inMilliseconds / ((widget.hedefSureDk * 60).toInt() * 1000);
-    return rawProgress - 1.0; 
+    double rawProgress =
+        _oyunZamani.inMilliseconds / ((widget.hedefSureDk * 60).toInt() * 1000);
+    return rawProgress - 1.0;
   }
 
   String _farkHesapla() {
     double farkAdet = _tamamlananAdet - _tavsanAdetKonumu();
     if (farkAdet > 4.0) farkAdet = 4.0;
-    int farkSaniye = (farkAdet * (widget.hedefSureDk * 60).toInt()).round(); 
+    int farkSaniye = (farkAdet * (widget.hedefSureDk * 60).toInt()).round();
     String isaret = farkSaniye >= 0 ? "+" : "-";
     int mutlakSaniye = farkSaniye.abs();
     return "$isaret ${mutlakSaniye ~/ 60}:${(mutlakSaniye % 60).toString().padLeft(2, '0')}";
   }
 
   Color _durumRengi() {
-    // Burada early return'ü kaldırdık, sayaç hemen renkli görünsün.
-    return (_tamamlananAdet >= _tavsanAdetKonumu()) ? const Color(0xFF6B8E23) : const Color(0xFFD65A31);
+    return (_tamamlananAdet >= _tavsanAdetKonumu())
+        ? const Color(0xFF6B8E23)
+        : const Color(0xFFD65A31);
   }
 
   Alignment _tavsanRelativePozisyonu() {
@@ -980,7 +1983,10 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
     double aciRadyan = tavsanYol * (math.pi / 4);
     double finalAci = (-math.pi / 2) + aciRadyan;
     double yaricapOrani = 0.88;
-    return Alignment(math.cos(finalAci) * yaricapOrani, math.sin(finalAci) * yaricapOrani);
+    return Alignment(
+      math.cos(finalAci) * yaricapOrani,
+      math.sin(finalAci) * yaricapOrani,
+    );
   }
 
   List<Widget> _buildCeltikler() {
@@ -992,7 +1998,11 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
           angle: aci,
           child: Align(
             alignment: Alignment.topCenter,
-            child: Container(width: 2, height: 10, color: const Color(0xFFA09E96)),
+            child: Container(
+              width: 2,
+              height: 10,
+              color: const Color(0xFFA09E96),
+            ),
           ),
         ),
       );
@@ -1008,27 +2018,62 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
       focusNode: _klavyeOdagi,
       autofocus: true,
       onKeyEvent: (event) {
-        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.space) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.space) {
           _birimTamamla();
         }
       },
       child: Scaffold(
+        backgroundColor: const Color(0xFFF5F2EA),
+        resizeToAvoidBottomInset: false,
         body: GestureDetector(
           onTap: () {
-            _birimTamamla(); 
-            _klavyeOdagi.requestFocus(); 
+            _birimTamamla();
+            _klavyeOdagi.requestFocus();
           },
           behavior: HitTestBehavior.opaque,
           child: Stack(
             children: [
-              Positioned(
-                bottom: 30, left: 0, right: 0,
-                child: Center(
-                  child: FloatingActionButton.extended(
-                    onPressed: _durdur,
-                    backgroundColor: const Color(0xFFD65A31), 
-                    icon: const Icon(Icons.pause, color: Colors.white),
-                    label: const Text("DURDUR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 40),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD65A31).withValues(alpha: 0.4),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _durdur();
+                      },
+                      icon: const Icon(Icons.pause, size: 28),
+                      label: Text(
+                        "DURDUR",
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD65A31),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1036,13 +2081,24 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24.0,
+                        vertical: 16.0,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.close, color: Color(0xFFA09E96), size: 30), 
-                            onPressed: _cikisSor
+                            icon: const Icon(Icons.close_rounded, size: 32),
+                            color: const Color(
+                              0xFF2E4035,
+                            ).withValues(alpha: 0.5),
+                            tooltip: "Çıkış",
+                            onPressed: () {
+                              _cikisIstegi();
+                            },
+                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(),
                           ),
                         ],
                       ),
@@ -1052,12 +2108,13 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           SizedBox(
-                            width: 360, height: 360,
+                            width: 320,
+                            height: 320,
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
                                 TweenAnimationBuilder(
-                                  tween: Tween<double>(end: dunyaDonusAcisi), 
+                                  tween: Tween<double>(end: dunyaDonusAcisi),
                                   duration: const Duration(milliseconds: 300),
                                   curve: Curves.easeOutBack,
                                   builder: (context, val, child) {
@@ -1067,23 +2124,50 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
                                         alignment: Alignment.center,
                                         children: [
                                           Container(
-                                            width: 280, height: 280,
+                                            width: 300,
+                                            height: 300,
                                             decoration: BoxDecoration(
-                                              shape: BoxShape.circle, 
-                                              border: Border.all(color: const Color(0x4DA09E96), width: 2)
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: const Color(
+                                                  0xFF2E4035,
+                                                ).withValues(alpha: 0.05),
+                                                width: 24,
+                                              ),
                                             ),
-                                            child: Stack(children: _buildCeltikler()),
                                           ),
-                                          
-                                          // --- YENİ TAVŞAN İKONU (DÖNEN) ---
+                                          SizedBox(
+                                            width: 250,
+                                            height: 250,
+                                            child: Stack(
+                                              children: _buildCeltikler(),
+                                            ),
+                                          ),
                                           Align(
-                                            alignment: _tavsanRelativePozisyonu(), 
+                                            alignment:
+                                                _tavsanRelativePozisyonu(),
                                             child: Transform.rotate(
-                                              angle: (_tavsanAdetKonumu() * (math.pi / 4)),
-                                              child: Image.asset(
-                                                'assets/images/tavsan_ikon.png', 
-                                                width: 45, 
-                                                height: 45,
+                                              angle:
+                                                  (_tavsanAdetKonumu() *
+                                                  (math.pi / 4)),
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: const Color(
+                                                        0xFFD65A31,
+                                                      ).withValues(alpha: 0.3),
+                                                      blurRadius: 20,
+                                                      spreadRadius: -5,
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: Image.asset(
+                                                  'assets/images/tavsan_ikon.png',
+                                                  width: 75,
+                                                  height: 75,
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -1092,48 +2176,86 @@ class _KokpitEkraniState extends State<KokpitEkrani> with TickerProviderStateMix
                                     );
                                   },
                                 ),
-                                
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _farkHesapla(),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 56,
+                                        fontWeight: FontWeight.w900,
+                                        color: _durumRengi(),
+                                        letterSpacing: -2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFF2E4035,
+                                        ).withValues(alpha: 0.05),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        widget.hedefMiktar > 0
+                                            ? "$_tamamlananAdet / ${widget.hedefMiktar}"
+                                            : "$_tamamlananAdet",
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF2E4035),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 Align(
-                                  alignment: const Alignment(0, -0.83), 
+                                  alignment: const Alignment(0, -0.72),
                                   child: Stack(
                                     alignment: Alignment.center,
                                     children: [
-                                      // RÜZGAR İZİ: Sadece ilk etkileşim yapıldıysa görünür
-                                      if (_ilkEtkilesimYapildi) 
+                                      if (_ilkEtkilesimYapildi)
                                         AnimatedBuilder(
                                           animation: _efektController,
                                           builder: (context, child) {
                                             return Opacity(
                                               opacity: _efektOpaklik.value,
                                               child: Transform.translate(
-                                                offset: Offset(-35.0 + _efektHareket.value, 0),
+                                                offset: Offset(
+                                                  -35.0 + _efektHareket.value,
+                                                  0,
+                                                ),
                                                 child: Transform.rotate(
-                                                  angle: -math.pi / 2, 
-                                                  child: const Icon(Icons.air, size: 30, color: Color(0x662E4035)),
+                                                  angle: -math.pi / 2,
+                                                  child: const Icon(
+                                                    Icons.air,
+                                                    size: 30,
+                                                    color: Color(0x662E4035),
+                                                  ),
                                                 ),
                                               ),
                                             );
                                           },
                                         ),
                                       Transform.rotate(
-                                        angle: math.pi / 2, 
-                                        child: const Icon(Icons.navigation, size: 32, color: Color(0xFF2E4035)),
-                                      ), 
+                                        angle: math.pi / 2,
+                                        child: const Icon(
+                                          Icons.navigation,
+                                          size: 36,
+                                          color: Color(0xFF2E4035),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(_farkHesapla(), style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: _durumRengi())),
-                                    const SizedBox(height: 10),
-                                    Text("$_tamamlananAdet / ${widget.hedefMiktar}", style: const TextStyle(fontSize: 24, color: Color(0xFFA09E96))),
-                                  ],
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(height: 60),
                         ],
                       ),
                     ),
