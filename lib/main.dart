@@ -14,9 +14,9 @@ void main() async {
   runApp(const HokusFocusApp());
 }
 
-// ----------------------------------------
-// VERİ YÖNETİCİSİ
-// ----------------------------------------
+
+
+
 class DataManager {
   static late SharedPreferences _prefs;
 
@@ -59,7 +59,7 @@ class DataManager {
     await _prefs.setDouble('genelAkisPuani', yeniOrt);
   }
 
-  // --- YENİ EKLENEN SIFIRLAMA FONKSİYONU ---
+
   static Future<void> verileriSifirla() async {
     await _prefs.setInt('toplamSureSn', 0);
     await _prefs.setInt('toplamOturum', 0);
@@ -68,6 +68,9 @@ class DataManager {
     await _prefs.setDouble('genelAkisPuani', 0.0);
   }
 }
+
+
+
 
 class HokusFocusApp extends StatelessWidget {
   const HokusFocusApp({super.key});
@@ -80,22 +83,35 @@ class HokusFocusApp extends StatelessWidget {
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFFF5F2EA),
         primaryColor: const Color(0xFF2E4035),
-        // --- SİHİRLİ DOKUNUŞ BURADA ---
+
         textTheme: GoogleFonts.poppinsTextTheme(),
-        // ------------------------------
+
         useMaterial3: true,
       ),
+
+      builder: (context, child) {
+        return Container(
+
+          color: const Color(0xFFEAEAEA),
+          child: Center(
+            child: ConstrainedBox(
+
+              constraints: const BoxConstraints(maxWidth: 400),
+
+              child: child,
+            ),
+          ),
+        );
+      },
+
       home: const KarsilamaEkrani(),
     );
   }
 }
 
-// ----------------------------------------
-// 0. EKRAN: KARŞILAMA
-// ----------------------------------------
-// ----------------------------------------
-// 0. EKRAN: KARŞILAMA (YENİLENMİŞ VİTRİN TASARIMI)
-// ----------------------------------------
+
+
+
 class KarsilamaEkrani extends StatefulWidget {
   const KarsilamaEkrani({super.key});
 
@@ -126,29 +142,12 @@ class _KarsilamaEkraniState extends State<KarsilamaEkrani> {
     });
   }
 
-  // --- BLOG SAYFASINA GİTME FONKSİYONU ---
-  void _blogAc() {
-    // İleride buraya WebView veya Blog sayfası gelecek.
-    // Şimdilik sadece bir SnackBar gösterelim.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          "Blog yakında burada olacak!",
-          style: GoogleFonts.poppins(),
-        ),
-        backgroundColor: const Color(0xFF2E4035),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
   String _formatSaatDk(int saniye) {
-    if (saniye < 60) return "${saniye}sn";
+    if (saniye == 0) return "0 dk"; // Skor tabelası etkisi!
+    if (saniye < 60) return "${saniye} sn";
     int saat = saniye ~/ 3600;
     int dk = (saniye % 3600) ~/ 60;
-    int sn = saniye % 60;
     if (saat > 0) return "${saat}sa ${dk}dk";
-    if (sn > 0) return "${dk}dk ${sn}sn";
     return "${dk}dk";
   }
 
@@ -229,15 +228,15 @@ class _KarsilamaEkraniState extends State<KarsilamaEkrani> {
             const Divider(),
             const SizedBox(height: 10),
             _buildStatRow(
-              "Odak Süresi",
+              "Focus Süresi",
               _formatSaatDk(_toplamSureSn),
               isBold: true,
             ),
             _buildStatRow("Oturumlar", "$_toplamOturum Kez"),
             const SizedBox(height: 10),
-            _buildStatRow("En Uzun Odak", _formatSaatDk(_enUzunOdak)),
+            _buildStatRow("En Uzun Focus", _formatSaatDk(_enUzunOdak)),
             _buildStatRow("Tamamlama Oranı", "%$tamamlamaOrani"),
-            _buildStatRow("Ritim Uyumu", "%${_akisPuani.toInt()}"),
+            _buildStatRow("Zaman Hakimiyetin", "%${_akisPuani.toInt()}"),
           ],
         ),
         actions: [
@@ -289,209 +288,161 @@ class _KarsilamaEkraniState extends State<KarsilamaEkrani> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F2EA),
       body: SafeArea(
-        child: Stack(
-          children: [
-            // 1. BLOG BUTONU (SAĞ ÜST KÖŞE)
-            Positioned(
-              top: 10,
-              right: 20,
-              child: TextButton.icon(
-                onPressed: _blogAc,
-                icon: const Icon(
-                  Icons.article_outlined,
-                  color: Color(0xFF2E4035),
-                  size: 20,
-                ),
-                label: Text(
-                  "Blog",
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 24),
+
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images/tavsan_ikon.png',
+                    width: 24,
+                    height: 24,
                     color: const Color(0xFF2E4035),
                   ),
-                ),
-                style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E4035).withOpacity(0.05),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                ),
-              ),
-            ),
-
-            // 2. ORTA ALAN (LOGO + MASKOT + SLOGAN)
-            Column(
-              children: [
-                const Spacer(flex: 2), // Üst boşluk
-                // MASKOT GÖRSELİ (Daire İçinde)
-                Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(
-                      0xFF2E4035,
-                    ).withOpacity(0.05), // Çok hafif yeşil arkaplan
-                  ),
-                  child: Center(
-                    child: Image.asset(
-                      'assets/images/tavsan_ikon.png', // Tavşanı buraya koyduk
-                      width: 100,
-                      height: 100,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // LOGO (HokusFocus)
-                RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    style: const TextStyle(
-                      fontFamily: 'Serif',
-                      fontStyle: FontStyle.italic,
-                      fontSize: 48, // Biraz küçülttük, çok bağırmasın
-                      letterSpacing: -1.0,
-                      color: Color(0xFF2E4035),
-                    ),
-                    children: const <TextSpan>[
-                      TextSpan(
-                        text: 'Hokus',
-                        style: TextStyle(fontWeight: FontWeight.w400),
+                  const SizedBox(width: 8),
+                  RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        color: const Color(0xFF2E4035),
+                        letterSpacing: -0.5,
                       ),
-                      TextSpan(
-                        text: 'Focus',
-                        style: TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // SLOGAN
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40.0),
-                  child: Text(
-                    "Zihnin odaklanmak zorunda kalacak...",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      // Sloganı daha okunaklı yaptık
-                      fontSize: 16,
-                      color: const Color(0xFFA09E96),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-
-                const Spacer(flex: 3), // Alt boşluk dengesi
-              ],
-            ),
-
-            // 3. ALT AKSİYON ALANI (BUTONLAR)
-            Positioned(
-              bottom: 30,
-              left: 24,
-              right: 24,
-              child: Column(
-                children: [
-                  // BAŞLA BUTONU (Ana Aksiyon)
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2E4035).withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
+                      children: const [
+                        TextSpan(
+                          text: 'Hokus',
+                          style: TextStyle(fontWeight: FontWeight.w400),
+                        ),
+                        TextSpan(
+                          text: 'Focus',
+                          style: TextStyle(fontWeight: FontWeight.w900),
                         ),
                       ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const KurulumEkrani(),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E4035),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 20,
-                        ), // Yüksekliği 20 yaptık
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        "BAŞLA",
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 3,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // İSTATİSTİKLER (İkincil Aksiyon - Buton Görünümlü Text)
-                  TextButton.icon(
-                    onPressed: _istatistikleriGoster,
-                    icon: const Icon(
-                      Icons.bar_chart_rounded,
-                      color: Color(0xFF2E4035),
-                    ),
-                    label: Text(
-                      "İstatistikler",
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF2E4035),
-                      ),
-                    ),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 20,
-                      ),
-                      backgroundColor: Colors.transparent, // Arkaplan yok
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-                  // Versiyon
-                  Text(
-                    "v1.2",
-                    style: GoogleFonts.poppins(
-                      color: const Color(0x4DA09E96),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+
+              const Spacer(flex: 2), // Üst boşluk esnekliği
+
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/images/tavsan_ikon.png',
+                      width: 100,
+                      height: 100,
+                      color: const Color(0xFF2E4035),
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      "Toplam Focus Süren",
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFA09E96),
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatSaatDk(
+                        _toplamSureSn,
+                      ), // Dinamik rekor, sıfırsa "0 dk" basar
+                      style: GoogleFonts.poppins(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF2E4035),
+                        letterSpacing: -1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(flex: 3), // Alt boşluk esnekliği
+
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF2E4035).withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const KurulumEkrani(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E4035),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 22),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          "BAŞLA",
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 3,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton.icon(
+                      onPressed: _istatistikleriGoster,
+                      icon: const Icon(
+                        Icons.bar_chart_rounded,
+                        color: Color(0xFFA09E96),
+                        size: 20,
+                      ),
+                      label: Text(
+                        "İstatistikleri Gör",
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFA09E96),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24), // En alt emniyet boşluğu
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ----------------------------------------
-// 1. EKRAN: KALİBRASYON
-// ----------------------------------------
+
+
+
 class KurulumEkrani extends StatefulWidget {
   const KurulumEkrani({super.key});
 
@@ -528,8 +479,8 @@ class _KurulumEkraniState extends State<KurulumEkrani>
   }
 
   void _baslat() {
-    // YENİ MANTIK: Eğer sonsuz mod açıksa hedef 0 olsun.
-    // Değilse kutuya girilen değeri al, boşsa 1 kabul et.
+
+
     int hedef = _sonsuzMod
         ? 0
         : (int.tryParse(
@@ -539,25 +490,25 @@ class _KurulumEkraniState extends State<KurulumEkrani>
               ) ??
               1);
 
-    // Sonsuz mod değilse ve hedef 1'den küçük girildiyse hata olmasın, en az 1 yapalım
+
     if (!_sonsuzMod && hedef < 1) hedef = 1;
 
     double birimSureDk = 0.0;
 
     if (_tabController.index == 0) {
-      // --- TAB 1: BİRİM SÜRE MODU ---
+
       double dk = double.tryParse(_dkController.text) ?? 0;
       double sn = double.tryParse(_snController.text) ?? 0;
       birimSureDk = dk + (sn / 60);
     } else {
-      // --- TAB 2: TOPLAM SÜRE MODU ---
+
       double toplamDk = double.tryParse(_toplamDkController.text) ?? 0.0;
-      // Sonsuz modda (hedef 0 ise) toplam süreyi bölemeyiz, o yüzden bir varsayılan değer (0.5) atıyoruz.
-      // Zaten sonsuz modda birim süre kullanıcı tarafından girilmediyse arka planda hesaplanması gerekmez.
+
+
       birimSureDk = (hedef > 0) ? toplamDk / hedef : 0.5;
     }
 
-    // Güvenlik önlemi: Süre 0 veya eksi çıkarsa varsayılan ata
+
     if (birimSureDk <= 0) birimSureDk = 0.5;
 
     Navigator.pushReplacement(
@@ -729,7 +680,7 @@ class _KurulumEkraniState extends State<KurulumEkrani>
                         ),
                         const SizedBox(height: 30),
 
-                        // --- YENİ EKLENEN KISIM: SWITCH ---
+
                         SwitchListTile(
                           title: const Text(
                             "Hedefsiz (Sonsuz) Mod",
@@ -752,7 +703,7 @@ class _KurulumEkraniState extends State<KurulumEkrani>
                           },
                         ),
 
-                        // Eğer sonsuz mod KAPALIYSA hedef kutusunu göster (Gizle/Göster mantığı)
+
                         if (!_sonsuzMod) ...[
                           const SizedBox(height: 10),
                           const Align(
@@ -856,7 +807,7 @@ class _KurulumEkraniState extends State<KurulumEkrani>
                     backgroundColor: const Color(0xFF2E4035),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 22),
-                    // Köşeleri daha yuvarlak yapıyoruz
+
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
@@ -889,7 +840,7 @@ class _KurulumEkraniState extends State<KurulumEkrani>
       ),
       filled: true,
       fillColor: Colors.white,
-      // Kenarlık çizgilerini siliyoruz (BorderSide.none), çünkü gölgeyle ayıracağız
+
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide.none,
@@ -958,7 +909,7 @@ class _OlcumDialogState extends State<OlcumDialog> {
         children: [
           Text(
             !_basladi
-                ? "Şimdi 1 sayfa/soru çözmeye başla ve butona bas. Bitince tekrar bas."
+                ? "Şimdi butona bas ve 1 sayfa/soru çözmeye başla. Bitince tekrar bas."
                 : "İşin bitince durdur.",
             textAlign: TextAlign.center,
           ),
@@ -991,9 +942,9 @@ class _OlcumDialogState extends State<OlcumDialog> {
   }
 }
 
-// ----------------------------------------
-// 2. EKRAN: KOKPİT (GÜNCELLENMİŞ ZAMAN HAKİMİYETİ)
-// ----------------------------------------
+
+
+
 class KokpitEkrani extends StatefulWidget {
   final double hedefSureDk;
   final int hedefMiktar;
@@ -1020,11 +971,11 @@ class _KokpitEkraniState extends State<KokpitEkrani>
   bool _duraklatildi = false;
   final FocusNode _klavyeOdagi = FocusNode();
 
-  // Mola sürelerini burada toplayacağız
+
   Duration _toplamMolaSuresi = Duration.zero;
 
-  // --- YENİ SİSTEM: SAF HAKİMİYET DEĞİŞKENLERİ ---
-  // Eski puan değişkenini sildik, yerine bunları koyduk.
+
+
   Duration _gecikmeSuresi = Duration.zero;
   DateTime? _gecikmeBaslangicZamani;
 
@@ -1057,15 +1008,15 @@ class _KokpitEkraniState extends State<KokpitEkrani>
         var simdi = DateTime.now();
         var gecenSure = simdi.difference(_tavsanBaslangicReferansi!);
 
-        // 1. Tavşanın doğal (süreye bağlı) yerini hesapla
+
         int birimMs = (widget.hedefSureDk * 60).toInt() * 1000;
         double rawProgress = gecenSure.inMilliseconds / birimMs;
         double tavsanKonum = rawProgress - 1.0;
 
-        // 2. Sınırı kontrol et (Senin konumun - 4.0)
+
         double altSinir = _tamamlananAdet - 4.0;
 
-        // 3. Catch-Up
+
         if (tavsanKonum < altSinir) {
           double hedefRaw = altSinir + 1.0;
           int hedefMs = (hedefRaw * birimMs).toInt();
@@ -1077,20 +1028,20 @@ class _KokpitEkraniState extends State<KokpitEkrani>
           _oyunZamani = gecenSure;
         }
 
-        // --- YENİ PUANLAMA MANTIĞI (TICKER İÇİNDE) ---
-        // Tavşan şu an beni geçti mi?
+
+
         double benimKonum = _tamamlananAdet.toDouble();
         double guncelTavsanKonumu = _tavsanAdetKonumu();
 
         if (guncelTavsanKonumu > benimKonum) {
-          // Tavşan önde! Ceza sayacı başlasın.
+
           if (_gecikmeBaslangicZamani == null) {
             _gecikmeBaslangicZamani = DateTime.now();
           }
         } else {
-          // Tavşan arkada! Güvendeyiz.
+
           if (_gecikmeBaslangicZamani != null) {
-            // Az önce gerideydik, şimdi yakaladık. O süreyi kumbaraya at.
+
             Duration buGecikme = DateTime.now().difference(
               _gecikmeBaslangicZamani!,
             );
@@ -1130,7 +1081,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 1. BAŞLIK (TOMBİKLEŞTİRİLDİ)
+
               const Text(
                 "NASIL ÇALIŞIR?",
                 style: TextStyle(
@@ -1144,12 +1095,12 @@ class _KokpitEkraniState extends State<KokpitEkrani>
 
               const SizedBox(height: 32),
 
-              // 2. GÖRSEL DÖNGÜ (OKLAR VE TAVŞAN SABİT)
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ADIM 1: ÇÖZ/OKU
+
                   _buildRehberAdim(
                     iconWidget: const Icon(
                       Icons.auto_stories,
@@ -1160,7 +1111,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
                     desc: "İşini tamamla",
                   ),
 
-                  // OK 1 (Hizalı)
+
                   const Padding(
                     padding: EdgeInsets.only(top: 16),
                     child: Icon(
@@ -1170,7 +1121,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
                     ),
                   ),
 
-                  // ADIM 2: DOKUN
+
                   _buildRehberAdim(
                     iconWidget: const Icon(
                       Icons.touch_app_rounded,
@@ -1182,7 +1133,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
                     highlight: true,
                   ),
 
-                  // OK 2 (Hizalı)
+
                   const Padding(
                     padding: EdgeInsets.only(top: 16),
                     child: Icon(
@@ -1192,7 +1143,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
                     ),
                   ),
 
-                  // ADIM 3: YAKALA
+
                   _buildRehberAdim(
                     iconWidget: Image.asset(
                       'assets/images/tavsan_ikon.png',
@@ -1208,7 +1159,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
 
               const SizedBox(height: 32),
 
-              // 3. ALT BİLGİ (Kendi cümleni yazana kadar bu kalsın)
+
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 8.0),
                 child: Text(
@@ -1226,12 +1177,12 @@ class _KokpitEkraniState extends State<KokpitEkrani>
 
               const SizedBox(height: 24),
 
-              // 4. BUTON (ARTIK "BAS BANA" DİYOR) 🔘🔥
+
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  // Bu gölge butonu havaya kaldırır (3D etkisi)
+
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFF2E4035).withValues(alpha: 0.4),
@@ -1273,7 +1224,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
     );
   }
 
-  // --- YARDIMCI WIDGET (SABİT 64px DAİRE + GENİŞ İÇ ALAN) ---
+
   Widget _buildRehberAdim({
     required Widget iconWidget,
     required String title,
@@ -1335,7 +1286,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
       _tavsanBaslangicReferansi = DateTime.now();
       _oyunZamani = Duration.zero;
       _ilkEtkilesimYapildi = false;
-      // Yeni sayaçları sıfırla
+
       _gecikmeSuresi = Duration.zero;
       _gecikmeBaslangicZamani = null;
     });
@@ -1369,8 +1320,8 @@ class _KokpitEkraniState extends State<KokpitEkrani>
     _ticker.stop();
     _gercekSureKronometresi.stop();
 
-    // MOLA GÜVENLİĞİ: Eğer şu an ceza yiyorsan, sayacı dondur.
-    // Diyalogda geçen süre ceza olarak yazılmasın.
+
+
     if (_gecikmeBaslangicZamani != null) {
       Duration buGecikme = DateTime.now().difference(_gecikmeBaslangicZamani!);
       _gecikmeSuresi += buGecikme;
@@ -1502,7 +1453,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
       _duraklatildi = true;
     });
 
-    // MOLA GÜVENLİĞİ: Ceza sayacını dondur
+
     if (_gecikmeBaslangicZamani != null) {
       Duration buGecikme = DateTime.now().difference(_gecikmeBaslangicZamani!);
       _gecikmeSuresi += buGecikme;
@@ -1639,7 +1590,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
       setState(() {
         _ilkEtkilesimYapildi = true;
         _tamamlananAdet++;
-        // Puan hesaplama artık burada yok.
+
       });
       _efektCalistir();
       return;
@@ -1647,12 +1598,12 @@ class _KokpitEkraniState extends State<KokpitEkrani>
 
     _efektCalistir();
 
-    // Sadece Tavşan Hareketi ve Kontrolü (Puan Yok)
+
     double tavsanKonumu = _tavsanAdetKonumu();
     double potansiyelYeniBen = (_tamamlananAdet + 1).toDouble();
     double potansiyelFark = potansiyelYeniBen - tavsanKonumu;
 
-    // Catch-up
+
     if (potansiyelFark > 4.0) {
       double yeniTavsanKonumu = potansiyelYeniBen - 4.0;
       int yeniMs = (yeniTavsanKonumu * (widget.hedefSureDk * 60).toInt() * 1000)
@@ -1683,22 +1634,22 @@ class _KokpitEkraniState extends State<KokpitEkrani>
     _ticker.stop();
     _gercekSureKronometresi.stop();
 
-    // --- FİNAL PUAN HESAPLAMASI (GÜNCELLENDİ) ---
-    // Eğer oyun biterken hala gerideysen, o son süreyi de ekle
+
+
     if (_gecikmeBaslangicZamani != null) {
       Duration buGecikme = DateTime.now().difference(_gecikmeBaslangicZamani!);
       _gecikmeSuresi += buGecikme;
     }
 
-    // Toplam geçen süre
+
     double toplamGecenSureMs = _gercekSureKronometresi.elapsedMilliseconds
         .toDouble();
     if (toplamGecenSureMs <= 0) toplamGecenSureMs = 1;
 
-    // Toplam ceza süresi
+
     double cezaMs = _gecikmeSuresi.inMilliseconds.toDouble();
 
-    // FORMÜL: 100 - ( (Geride Geçen Süre / Toplam Süre) * 100 )
+
     double hamPuan = 100.0 - ((cezaMs / toplamGecenSureMs) * 100);
 
     if (hamPuan < 0) hamPuan = 0;
@@ -1706,7 +1657,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
 
     double akisPuaniYuzde = hamPuan; // Artık gerçek hakimiyet puanı bu.
 
-    // ---------------------------------------------
+
 
     int hesaplananAdet = _tamamlananAdet;
     if (baslik == "KOPTUN") {
@@ -1821,7 +1772,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
               ),
               const SizedBox(height: 24),
 
-              // SKOR KARTI - ZAMAN HAKİMİYETİ
+
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 20),
@@ -1854,7 +1805,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
               ),
               const SizedBox(height: 16),
 
-              // 3'LÜ DETAY KUTUSU
+
               Row(
                 children: [
                   Expanded(
@@ -1922,7 +1873,7 @@ class _KokpitEkraniState extends State<KokpitEkrani>
     );
   }
 
-  // Yardımcı widget
+
   Widget _buildResultBox(IconData icon, String value, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
